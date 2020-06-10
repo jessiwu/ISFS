@@ -1,7 +1,7 @@
 CC = gcc
 
 build: isfs.o
-	$(CC) -Wall isfs.o -o isfs `pkg-config fuse --cflags --libs`
+	$(CC) -Wall isfs.o `pkg-config fuse --cflags --libs` -o isfs
 	echo 'To Mount: ./isfs -f [mount point]'
 
 isfs.o: isfs.c
