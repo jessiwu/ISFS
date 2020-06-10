@@ -21,3 +21,13 @@ parameter settings
 - data blocks = 19608 pages = 156864 blocks
 
 - total requires = 208993 pages = 856035328 bytes
+
+steps to mount a USB device with EXT4 filesystem
+- edit /etc/fstab   (fstab is your OS's file system table)
+- add new line "UUID=527420a1-bd6e-4b7c-9599-7b04ebf5ba02 ~/mnt/usb32g ext4 auto,user,rw 0 0"
+
+useful linux commands
+- sudo blkid: to check the UUID of USB device
+- sudo fdisk -l
+- df -Th
+- mount -t /dev/sdg ~/mnt/usb32g
