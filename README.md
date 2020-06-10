@@ -11,13 +11,13 @@ advanced requirement
 - Buffer Cache optimization (method to reduce search times)
 
 parameter settings
-1 block size = 512 bytes
-1 page = 4096 bytes = 8 blocks
+- 1 block size = 512 bytes
+- 1 page = 4096 bytes = 8 blocks
 
-superblock = 1 page = 8 blocks
-block bitmap = 48 pages = 384 blocks
-inode bitmap = 48 pages = 384 blocks
-inode table = 12288 pages = 98304 blocks
-data blocks = 19608 pages = 156864 blocks
+- superblock = 1 page = 8 blocks
+- block bitmap = 48 pages = 384 blocks
+- inode bitmap = 48 pages = 384 blocks
+- inode table = 12288 pages = 98304 blocks
+- data blocks = 19608 pages = 156864 blocks
 
-total requires = 208993 pages = 856035328 bytes
+- total requires = 208993 pages = 856035328 bytes
