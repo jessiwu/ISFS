@@ -23,8 +23,10 @@ parameter settings
 - total requires = 208993 pages = 856035328 bytes
 
 steps to mount a USB device with EXT4 filesystem
+- mkdir ~/mnt
+- mkdir ~/mnt/usb32g
 - edit /etc/fstab   (fstab is your OS's file system table)
-- add new line "UUID=527420a1-bd6e-4b7c-9599-7b04ebf5ba02 ~/mnt/usb32g ext4 auto,user,rw 0 0"
+- add new line "UUID=527420a1-bd6e-4b7c-9599-7b04ebf5ba02 ~/mnt/usb32g ext4 auto,user,rw 0 0" (use sudo blkid to check the UUID)
 
 useful linux commands
 - sudo blkid: to check the UUID of USB device
