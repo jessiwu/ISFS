@@ -1,5 +1,5 @@
 CE6154 System Component Design for Emerging Memory and Storage Technologies final project: 
-In-storage Filesystem (ISFS)
+In-storage Filesystem (ISFS) - Persist both metadata and file data into a USB drive
 
 fundamental requirement
 - all file data can still be accessed after re-mounting ISFS.
