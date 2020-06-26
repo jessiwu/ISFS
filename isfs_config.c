@@ -2,6 +2,4 @@
 
 // TODO: define the declared functions in isfs_config.h
 //       - mknod implementation
-//       - create directories data structure
-//       - create root directory
-//       - 
+//       - getattr() : isdir() implementation

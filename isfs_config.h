@@ -3,14 +3,15 @@
 
 #include <time.h>
 
-#define BLK_SIZE 512    // block size in bytes
-#define PAGE_SIZE 4096  // page size in bytes
-#define INODE_SIZE 256  // inode size in bytes
-#define SUPERBLK_SIZE 4096  // superblock size in bytes
-#define INODE_COUNT 196608  // the total number of inodes
-#define BLK_COUNT 156864  // the total number of blocks (in blocks)
-#define DIRECT_BLOCK_PTR_NUM 12  // the number of direct data block pointers for one inode
-#define DIR_ENTRY_NAME_LEN 256  // the maximum length of name of this directory entry
+#define BLK_SIZE 512                // block size in bytes
+#define PAGE_SIZE 4096              // page size in bytes
+#define INODE_SIZE 256              // inode size in bytes
+#define SUPERBLK_SIZE 4096          // superblock size in bytes
+#define INODE_COUNT 196608          // the total number of inodes
+#define BLK_COUNT 156864            // the total number of blocks (in blocks)
+#define DIRECT_BLOCK_PTR_NUM 12     // the number of direct data block pointers for one inode
+#define DIR_ENTRY_NAME_LEN 256      // the maximum length of name of this directory entry
+#define ROOT_DIR_INODE_NUM 2        // the inode number of the root directory
 
 struct super_block {
     int blk_size;
