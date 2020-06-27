@@ -216,7 +216,7 @@ int remove_dir( const char* path )
 
 static int do_getattr( const char *path, struct stat *st )
 {
-	printf("Getting attributes of files/directories ...\n");
+	printf("--- Getting attributes of files/directories ...\n");
 	st->st_uid = getuid(); // The owner of the file/directory is the user who mounted the filesystem
 	st->st_gid = getgid(); // The group of the file/directory is the same as the group of the user who mounted the filesystem
 	
@@ -235,6 +235,7 @@ static int do_getattr( const char *path, struct stat *st )
 		return 0;
 	}
 	else {
+		// iterate through the directory table of the root dir
 		struct directory_entry* tmp_entry;
 		struct data_block* tmp_data_blk;
 		for(int i=0; i<DIRECT_BLOCK_PTR_NUM; i++) {
@@ -246,6 +247,8 @@ static int do_getattr( const char *path, struct stat *st )
 				printf("found the file %d\n", i);
 				struct	inode* tmp_found = inode_table_ptr + (tmp_entry->inode_num);
 				st->st_mode = ( tmp_entry->file_type == 2) ? S_IFDIR | 0755 : S_IFREG | 0644;
+				st->st_size = super_ptr->blk_size;		// unsupport big file ( only <= 512 bytes )
+				st->st_nlink = 2;
 				st->st_ino = tmp_entry->inode_num;		// need run with this option: -o use_ino
 				st->st_atime = tmp_found->atime.tv_sec;
 				st->st_ctime = tmp_found->ctime.tv_sec;
@@ -260,40 +263,81 @@ static int do_getattr( const char *path, struct stat *st )
 
 static int do_readdir( const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi )
 {
-	// filler( buffer, ".", NULL, 0 );		// Current Directory
-	// filler( buffer, "..", NULL, 0 ); 	// Parent Directory
-	
+	printf("--- Reading directories ...\n");
+	const char* new_path = path+1;
+	printf("path: %s\n", path);
+	printf("new path: %s\n", new_path);
+	struct inode* root = inode_table_ptr+ ( super_ptr->root_dir_inode_num );
 	if ( strcmp( path, "/" ) == 0 ) {
-		struct inode* rootdir = inode_table_ptr+ ( super_ptr->root_dir_inode_num );
-		int entry_table_idx = 0;
-		struct directory_entry* entry = (struct directory_entry*) rootdir->direct_blk_ptr[entry_table_idx];
-		while(entry!=NULL) {
-			filler( buffer, entry->name, NULL, 0);
-			printf("entry name: %s\n", entry->name);
-			entry = (struct directory_entry*) rootdir->direct_blk_ptr[++entry_table_idx];
+		int dir_entry_table_idx = 0;
+		struct directory_entry* cur_entry = (struct directory_entry*) root->direct_blk_ptr[dir_entry_table_idx];
+		while(cur_entry!=NULL) {
+			printf("- entry name: %s\n", cur_entry->name);
+			filler( buffer, cur_entry->name, NULL, 0);
+			cur_entry = (struct directory_entry*) root->direct_blk_ptr[++dir_entry_table_idx];
 		}
+		return 0;
 	}
+	else {
+		// read directories other than rootdir
+		// iterate through the directory table of the root dir
+		struct directory_entry* cur_entry;
+		struct data_block* tmp_data_blk;
+		for(int i=0; i<DIRECT_BLOCK_PTR_NUM; i++) {
+			tmp_data_blk = root->direct_blk_ptr[i];
+			if(tmp_data_blk==NULL)
+				return -ENOENT;
+			cur_entry = (struct directory_entry* ) tmp_data_blk;
+			if( strcmp(cur_entry->name, new_path) == 0 ) {	// found the file/directory by the path parameter
+				printf("found the directory: %s at entry: %d\n", cur_entry->name, i);
+				struct	inode* tmp_found = inode_table_ptr + (cur_entry->inode_num);
 
-	return 0;
+				//iterate through the directory of this directory
+				int dir_entry_table_idx = 0;
+				struct directory_entry* entry = (struct directory_entry*) tmp_found->direct_blk_ptr[dir_entry_table_idx];
+				while(entry!=NULL) {
+					printf("entry name: %s\n", entry->name);
+					filler( buffer, entry->name, NULL, 0);
+					entry = (struct directory_entry*) tmp_found->direct_blk_ptr[++dir_entry_table_idx];
+				}
+				break;
+			}
+		}
+		return 0;
+	}
+	return -1;
 }
 
 static int do_read( const char *path, char *buffer, size_t size, off_t offset, struct fuse_file_info *fi )
 {
-	int file_idx = get_file_index( path );
+	printf("--- Reading a file ...\n");
+	const char* filename = path+1;
+	char* file_content;
+	struct inode* root = inode_table_ptr+ ( super_ptr->root_dir_inode_num );
 	
-	if ( file_idx == -1 )
-		return -1;
-	
-	char *content = files_content[ file_idx ];
-	
-	memcpy( buffer, content + offset, size );
+	// iterate through the directory table of the root dir
+	struct data_block* tmp_data_blk;
+	struct directory_entry* tmp_entry;
+	for(int i=0; i<DIRECT_BLOCK_PTR_NUM; i++) {
+		tmp_data_blk = root->direct_blk_ptr[i];
+		if(tmp_data_blk==NULL)
+			return -ENOENT;
+		tmp_entry = (struct directory_entry* ) tmp_data_blk;
+		if( strcmp(tmp_entry->name, filename) == 0 ) {		// found the file by the path parameter
+			printf("found the file:\nfilename: %s at entry: %d\n", filename, i);
+			struct	inode* tmp_found = inode_table_ptr + (tmp_entry->inode_num);
 
-	struct timespec current_time;
-
-	clock_gettime(CLOCK_REALTIME, &current_time);
-	file_atime_list[file_idx] = current_time;
-	
-	return strlen( content ) - offset;
+			// !!! big file need to iterate through data blocks !!!
+			file_content = tmp_found->direct_blk_ptr[0]->buf;
+			printf("file content: %s\n", tmp_found->direct_blk_ptr[0]->buf);
+			memcpy(buffer, file_content + offset, size);	// copy file content to the buffer
+			printf("cat buffer: %s\n", buffer);
+			
+			tmp_found->mtime = return_current();
+			break;
+		}
+	}	
+	return strlen( file_content ) - offset;
 }
 
 static int do_mkdir( const char *path, mode_t mode )
@@ -358,17 +402,75 @@ static int do_mkdir( const char *path, mode_t mode )
 
 static int do_mknod( const char *path, mode_t mode, dev_t rdev )
 {
-	path++;
-	add_file( path );
-	
+	printf("--- Creating a new file ...\n");
+	const char* new_filename = path+1;
+	printf("new file name: %s\n", new_filename);
+	printf("i_bitmap_cur_idx is: %d\n", i_bitmap_cur_idx);
+	i_bitmap_cur_idx++;
+	printf("i_bitmap_cur_idx is: %d\n", i_bitmap_cur_idx);
+
+	// allocate new inode
+	struct inode* cur_inode_ptr = inode_table_ptr+i_bitmap_cur_idx;
+	struct data_block* tmp_data_blk = allocateDataBlock();
+	cur_inode_ptr->direct_blk_ptr[0] = tmp_data_blk;
+
+	cur_inode_ptr->atime = return_current();
+	cur_inode_ptr->ctime = return_current();
+	cur_inode_ptr->mtime = return_current();
+
+	// update inode bitmap
+	i_bitmap.inode_bitmap[i_bitmap_cur_idx] = 1;
+
+	// add new directory entry under the directory table of the root dir
+	struct inode* root = inode_table_ptr+(super_ptr->root_dir_inode_num);
+	for(int i=0; i<DIRECT_BLOCK_PTR_NUM; i++) {
+		printf("int i: %d\n", i);
+		if(root->direct_blk_ptr[i]==NULL) {
+			// add new entry
+			printf("add new entry at int i: %d\n", i);
+			struct data_block* new_entry = allocateDataBlock();
+			root->direct_blk_ptr[i] = new_entry;
+
+			struct directory_entry* new_entry_ptr = (struct directory_entry*) new_entry;
+			new_entry_ptr->inode_num = i_bitmap_cur_idx;
+			new_entry_ptr->file_type = REGULAR;
+			strncpy(new_entry_ptr->name, new_filename, DIR_ENTRY_NAME_LEN);
+			break;
+		}
+	}
+
 	return 0;
 }
 
 static int do_write( const char *path, const char *buffer, size_t size, off_t offset, struct fuse_file_info *info )
 {
-	write_to_file( path, buffer );
+	printf("--- Writing to a file ...\n");
+	const char* new_file_path = path+1;
+	struct inode* root = inode_table_ptr+ ( super_ptr->root_dir_inode_num );
 	
-	return size;
+	if(strlen(buffer)<512) {
+		// iterate through the directory table of the root dir
+		struct directory_entry* tmp_entry;
+		struct data_block* tmp_data_blk;
+		for(int i=0; i<DIRECT_BLOCK_PTR_NUM; i++) {
+			tmp_data_blk = root->direct_blk_ptr[i];
+			if(tmp_data_blk==NULL)
+				return -ENOENT;
+			tmp_entry = (struct directory_entry* ) tmp_data_blk;
+			if( strcmp(tmp_entry->name, new_file_path) == 0 ) {	// found the file/directory by the path parameter
+				printf("found the file %d\n", i);
+				struct	inode* tmp_found = inode_table_ptr + (tmp_entry->inode_num);
+				strcpy(tmp_found->direct_blk_ptr[0]->buf, buffer);
+				printf("file content: %s\n", tmp_found->direct_blk_ptr[0]->buf);
+				printf("buffer: %s\n", buffer);
+				tmp_found->mtime = return_current();
+				break;
+			}
+		}
+		return size;
+	}
+
+	return -1;
 }
 
 static int do_unlink( const char *path )
