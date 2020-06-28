@@ -40,179 +40,7 @@ static int create_root_dir();
 struct timespec return_current();
 struct data_block* allocateDataBlock();
 
-// ... //
-
 char* MNT_POINT;
-
-char dir_list[ 256 ][ 256 ];
-int curr_dir_idx = -1;
-
-char files_list[ 256 ][ 256 ];
-int curr_file_idx = -1;
-
-char files_content[ 256 ][ 256 ];
-int curr_file_content_idx = -1;
-
-struct timespec dir_atime_list[256];
-struct timespec dir_mtime_list[256];
-struct timespec dir_ctime_list[256];
-
-struct timespec file_atime_list[256];
-struct timespec file_mtime_list[256];
-struct timespec file_ctime_list[256];
-
-void add_dir( const char *dir_name )
-{
-	curr_dir_idx++;
-	strcpy( dir_list[ curr_dir_idx ], dir_name );
-
-	struct timespec current_time;
-
-	clock_gettime(CLOCK_REALTIME, &current_time);
-	dir_atime_list[curr_dir_idx] = current_time;
-	dir_mtime_list[curr_dir_idx] = current_time;
-	dir_ctime_list[curr_dir_idx] = current_time;
-}
-
-int is_dir( const char *path )
-{
-	path++; // Eliminating "/" in the path
-	
-	for ( int curr_idx = 0; curr_idx <= curr_dir_idx; curr_idx++ )
-		if ( strcmp( path, dir_list[ curr_idx ] ) == 0 )
-			return 1;
-	
-	return 0;
-}
-
-void add_file( const char *filename )
-{
-	curr_file_idx++;
-	strcpy( files_list[ curr_file_idx ], filename );
-	
-	curr_file_content_idx++;
-	strcpy( files_content[ curr_file_content_idx ], "" );
-
-	struct timespec current_time;
-
-	clock_gettime(CLOCK_REALTIME, &current_time);
-	file_atime_list[curr_file_idx] = current_time;
-	file_mtime_list[curr_file_idx] = current_time;
-	file_ctime_list[curr_file_idx] = current_time;
-}
-
-int is_file( const char *path )
-{
-	path++; // Eliminating "/" in the path
-	
-	for ( int curr_idx = 0; curr_idx <= curr_file_idx; curr_idx++ )
-		if ( strcmp( path, files_list[ curr_idx ] ) == 0 )
-			return 1;
-	
-	return 0;
-}
-
-int get_file_index( const char *path )
-{
-	path++; // Eliminating "/" in the path
-	
-	for ( int curr_idx = 0; curr_idx <= curr_file_idx; curr_idx++ )
-		if ( strcmp( path, files_list[ curr_idx ] ) == 0 )
-			return curr_idx;
-	
-	return -1;
-}
-
-int get_dir_index( const char *path )
-{
-	path++; // Eliminating "/" in the path
-	
-	for ( int curr_idx = 0; curr_idx <= curr_dir_idx; curr_idx++ )
-		if ( strcmp( path, dir_list[ curr_idx ] ) == 0 )
-			return curr_idx;
-	
-	return -1;
-}
-
-void write_to_file( const char *path, const char *new_content )
-{
-
-	int file_idx = get_file_index( path );
-	
-	if ( file_idx == -1 ) // No such file
-		return;
-		
-	strcpy( files_content[ file_idx ], new_content );
-	
-	struct timespec current_time;
-
-	clock_gettime(CLOCK_REALTIME, &current_time);
-	file_mtime_list[file_idx] = current_time;
-}
-
-int remove_file( const char* path )
-{
-	if( is_file(path) ) {
-		int file_idx = get_file_index( path );
-
-		if ( file_idx == -1 ) // No such file
-			return -ENOENT;
-		else {	 // Delete this file
-			path++;
-
-			// test
-			if(file_idx==curr_file_idx){
-				memset(files_list[ curr_file_idx ], '\0', sizeof(files_list[ curr_file_idx ]));
-				memset(files_content[ curr_file_idx ], '\0', sizeof(files_content[ curr_file_idx ]));
-			}
-			else {
-				for ( int curr_idx = file_idx+1; curr_idx <= curr_file_idx; curr_idx++ ) {
-					memset(files_list[ curr_idx-1 ], '\0', sizeof(files_list[ curr_idx-1 ]));
-					memset(files_content[ curr_idx-1 ], '\0', sizeof(files_content[ curr_idx-1 ]));
-					strcpy( files_list[ curr_idx-1  ], files_list[ curr_idx ] ); 
-					strcpy( files_content[ curr_idx-1  ],  files_content[ curr_idx ]);
-				}
-			}
-
-			curr_file_idx--;
-			curr_file_content_idx--;
-			
-			return 0; // delete file successfully
-		}
-	}
-	else
-		return -1;
-}
-
-int remove_dir( const char* path )
-{
-	if( is_dir(path) ) {
-		int dir_idx = get_dir_index( path );
-
-		if ( dir_idx == -1 ) // No such file
-			return -ENOENT;
-		else {	 // Delete this file
-			path++;
-
-			// test
-			if(dir_idx==curr_dir_idx){
-				memset(dir_list[ curr_dir_idx ], '\0', sizeof(dir_list[ curr_dir_idx ]));
-			}
-			else {
-				for ( int curr_idx = dir_idx+1; curr_idx <= curr_dir_idx; curr_idx++ ) {
-					memset(dir_list[ curr_idx-1 ], '\0', sizeof(dir_list[ curr_idx-1 ]));
-					strcpy( dir_list[ curr_idx-1  ], dir_list[ curr_idx ] ); 
-				}
-			}
-			curr_dir_idx--;
-			return 0; // delete file successfully
-		}
-	}
-	else
-		return -1;
-}
-
-// ... //
 
 static int do_getattr( const char *path, struct stat *st )
 {
@@ -243,12 +71,12 @@ static int do_getattr( const char *path, struct stat *st )
 			if(tmp_data_blk==NULL)
 				return -ENOENT;
 			tmp_entry = (struct directory_entry* ) tmp_data_blk;
-			if( strcmp(tmp_entry->name, new_path) == 0 ) {	// found the file/directory by the path parameter
+			if( strcmp(tmp_entry->name, new_path) == 0 && tmp_entry->inode_num != 0 ) {	// found the file/directory by the path parameter
 				printf("found the file %d\n", i);
 				struct	inode* tmp_found = inode_table_ptr + (tmp_entry->inode_num);
 				st->st_mode = ( tmp_entry->file_type == 2) ? S_IFDIR | 0755 : S_IFREG | 0644;
 				st->st_size = super_ptr->blk_size;		// unsupport big file ( only <= 512 bytes )
-				st->st_nlink = 2;
+				st->st_nlink = ( tmp_entry->file_type == 2) ? 2 : 1;
 				st->st_ino = tmp_entry->inode_num;		// need run with this option: -o use_ino
 				st->st_atime = tmp_found->atime.tv_sec;
 				st->st_ctime = tmp_found->ctime.tv_sec;
@@ -272,8 +100,10 @@ static int do_readdir( const char *path, void *buffer, fuse_fill_dir_t filler, o
 		int dir_entry_table_idx = 0;
 		struct directory_entry* cur_entry = (struct directory_entry*) root->direct_blk_ptr[dir_entry_table_idx];
 		while(cur_entry!=NULL) {
-			printf("- entry name: %s\n", cur_entry->name);
-			filler( buffer, cur_entry->name, NULL, 0);
+			if(cur_entry->inode_num!=0) {
+				printf("- entry name: %s\n", cur_entry->name);
+				filler( buffer, cur_entry->name, NULL, 0);
+			}
 			cur_entry = (struct directory_entry*) root->direct_blk_ptr[++dir_entry_table_idx];
 		}
 		return 0;
@@ -288,7 +118,7 @@ static int do_readdir( const char *path, void *buffer, fuse_fill_dir_t filler, o
 			if(tmp_data_blk==NULL)
 				return -ENOENT;
 			cur_entry = (struct directory_entry* ) tmp_data_blk;
-			if( strcmp(cur_entry->name, new_path) == 0 ) {	// found the file/directory by the path parameter
+			if( strcmp(cur_entry->name, new_path) == 0 && cur_entry->inode_num != 0 ) {	// found the directory by the path parameter
 				printf("found the directory: %s at entry: %d\n", cur_entry->name, i);
 				struct	inode* tmp_found = inode_table_ptr + (cur_entry->inode_num);
 
@@ -296,8 +126,10 @@ static int do_readdir( const char *path, void *buffer, fuse_fill_dir_t filler, o
 				int dir_entry_table_idx = 0;
 				struct directory_entry* entry = (struct directory_entry*) tmp_found->direct_blk_ptr[dir_entry_table_idx];
 				while(entry!=NULL) {
-					printf("entry name: %s\n", entry->name);
-					filler( buffer, entry->name, NULL, 0);
+					if(cur_entry->inode_num!=0) {
+						printf("entry name: %s\n", entry->name);
+						filler( buffer, entry->name, NULL, 0);
+					}
 					entry = (struct directory_entry*) tmp_found->direct_blk_ptr[++dir_entry_table_idx];
 				}
 				break;
@@ -314,7 +146,7 @@ static int do_read( const char *path, char *buffer, size_t size, off_t offset, s
 	const char* filename = path+1;
 	char* file_content;
 	struct inode* root = inode_table_ptr+ ( super_ptr->root_dir_inode_num );
-	
+
 	// iterate through the directory table of the root dir
 	struct data_block* tmp_data_blk;
 	struct directory_entry* tmp_entry;
@@ -323,7 +155,7 @@ static int do_read( const char *path, char *buffer, size_t size, off_t offset, s
 		if(tmp_data_blk==NULL)
 			return -ENOENT;
 		tmp_entry = (struct directory_entry* ) tmp_data_blk;
-		if( strcmp(tmp_entry->name, filename) == 0 ) {		// found the file by the path parameter
+		if( strcmp(tmp_entry->name, filename) == 0 && tmp_entry->inode_num != 0 ) {		// found the file by the path parameter
 			printf("found the file:\nfilename: %s at entry: %d\n", filename, i);
 			struct	inode* tmp_found = inode_table_ptr + (tmp_entry->inode_num);
 
@@ -336,7 +168,7 @@ static int do_read( const char *path, char *buffer, size_t size, off_t offset, s
 			tmp_found->mtime = return_current();
 			break;
 		}
-	}	
+	}
 	return strlen( file_content ) - offset;
 }
 
@@ -457,7 +289,7 @@ static int do_write( const char *path, const char *buffer, size_t size, off_t of
 			if(tmp_data_blk==NULL)
 				return -ENOENT;
 			tmp_entry = (struct directory_entry* ) tmp_data_blk;
-			if( strcmp(tmp_entry->name, new_file_path) == 0 ) {	// found the file/directory by the path parameter
+			if( strcmp(tmp_entry->name, new_file_path) == 0 && tmp_entry->inode_num != 0 ) {	// found the file/directory by the path parameter
 				printf("found the file %d\n", i);
 				struct	inode* tmp_found = inode_table_ptr + (tmp_entry->inode_num);
 				strcpy(tmp_found->direct_blk_ptr[0]->buf, buffer);
@@ -475,53 +307,98 @@ static int do_write( const char *path, const char *buffer, size_t size, off_t of
 
 static int do_unlink( const char *path )
 {
-	int res = remove_file(path);
+	const char* new_path = path+1;
+	printf("--- Removing the file: %s ...\n", new_path);
 	
-	return res;
+	struct inode* root = inode_table_ptr+ ( super_ptr->root_dir_inode_num );
+	struct directory_entry* tmp_entry;
+	struct data_block* tmp_data_blk;
+
+	// iterate through the directory table of the root dir
+	for(int i=0; i<DIRECT_BLOCK_PTR_NUM; i++) {
+		tmp_data_blk = root->direct_blk_ptr[i];
+		if(tmp_data_blk==NULL)
+			return -ENOENT;
+		tmp_entry = (struct directory_entry* ) tmp_data_blk;
+		if( strcmp(tmp_entry->name, new_path) == 0 && tmp_entry->inode_num != 0 ) {	// found the file by the path parameter
+			printf("found the file %s\n", new_path);
+			if(tmp_entry->file_type == 1) {	
+				tmp_entry->inode_num = 0;
+				return 0;
+			}
+			else
+				return -1;
+		}
+	}
+	
+	return -ENOENT;
 }
 
 static int do_rmdir(const char * path)
 {
-	int res = remove_dir(path);
-	return res;
+	const char* new_path = path+1;
+	printf("--- Removing the directory: %s ...\n", new_path);
+	
+	struct inode* root = inode_table_ptr+ ( super_ptr->root_dir_inode_num );
+	struct directory_entry* tmp_entry;
+	struct data_block* tmp_data_blk;
+
+	// iterate through the directory table of the root dir
+	for(int i=0; i<DIRECT_BLOCK_PTR_NUM; i++) {
+		tmp_data_blk = root->direct_blk_ptr[i];
+		if(tmp_data_blk==NULL)
+			return -ENOENT;
+		tmp_entry = (struct directory_entry* ) tmp_data_blk;
+		if( strcmp(tmp_entry->name, new_path) == 0 && tmp_entry->inode_num != 0 ) {	// found the directory by the path parameter
+			printf("found the directory %s\n", tmp_entry->name);
+			if(tmp_entry->file_type == 2) {		
+				tmp_entry->inode_num = 0;
+				return 0;
+			}
+			else
+				return -1;
+		}
+	}
+	
+	return -ENOENT;
 }
 
 static int do_utimens(const char * path, const struct timespec tv[2])//, struct fuse_file_info *fi)
 {
-	if( is_dir(path) ){
-		int dir_idx = get_dir_index( path );
+	printf("--- Changing files/directories timestamps ...\n");
+	
+	printf("path: %s\n", path);
+	const char* new_path = path+1;
+	printf("new path: %s\n", new_path);
 
-		if( dir_idx == -1 )
-			return -ENOENT;
-		else{
-			struct timespec current_time;
-
-			clock_gettime(CLOCK_REALTIME, &current_time);
-			dir_atime_list[dir_idx] = current_time;
-			dir_mtime_list[dir_idx] = current_time;
-			dir_ctime_list[dir_idx] = current_time;
-
-			return 0;
-		}
+	struct inode* root = inode_table_ptr+ ( super_ptr->root_dir_inode_num );
+	if ( strcmp( path, "/" ) == 0 ) {
+		root->atime = return_current();
+		root->ctime = return_current();
+		root->mtime = return_current();
+		return 0;
 	}
-	else if( is_file(path) ) {
-		int file_idx = get_file_index( path );
-
-		if( file_idx == -1 )
-			return -ENOENT;
-		else{
-			struct timespec current_time;
-
-			clock_gettime(CLOCK_REALTIME, &current_time);
-			file_atime_list[file_idx] = current_time;
-			file_mtime_list[file_idx] = current_time;
-			file_ctime_list[file_idx] = current_time;
-			
-			return 0;
+	else {
+		// iterate through the directory table of the root dir
+		struct directory_entry* tmp_entry;
+		struct data_block* tmp_data_blk;
+		for(int i=0; i<DIRECT_BLOCK_PTR_NUM; i++) {
+			tmp_data_blk = root->direct_blk_ptr[i];
+			if(tmp_data_blk==NULL)
+				return -ENOENT;
+			tmp_entry = (struct directory_entry* ) tmp_data_blk;
+			if( strcmp(tmp_entry->name, new_path) == 0 && tmp_entry->inode_num != 0 ) {	// found the file/directory by the path parameter
+				printf("found the file %d\n", i);
+				struct	inode* tmp_found = inode_table_ptr + (tmp_entry->inode_num);
+				tmp_found->atime = return_current();
+				tmp_found->ctime = return_current();
+				tmp_found->mtime = return_current();
+				break;
+			}
 		}
+		return 0;
 	}
-	else
-		return -1;
+	return -ENOENT;
 }
 
 
