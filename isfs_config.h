@@ -10,6 +10,7 @@
 #define INODE_COUNT 196608          // the total number of inodes
 #define BLK_COUNT 156864            // the total number of blocks (in blocks)
 #define DIRECT_BLOCK_PTR_NUM 12     // the number of direct data block pointers for one inode
+#define INDIRECT_BLOCK_PTR_NUM 128  // the number of data blocks which one indirect data block points to
 #define DIR_ENTRY_NAME_LEN 256      // the maximum length of name of this directory entry
 #define ROOT_DIR_INODE_NUM 2        // the inode number of the root directory
 
@@ -44,6 +45,9 @@ struct inode {
     struct data_block* single_indirect_ptr;
     struct data_block* double_indirect_ptr;
     struct data_block* triple_indirect_ptr;
+
+    int direct[DIRECT_BLOCK_PTR_NUM];
+    int single_indirect;
 };
 
 /*
@@ -58,7 +62,8 @@ struct inode {
 // struct data_block data_block_table[BLK_COUNT];  // 1 data block table contains [BLK_COUNT:156864] data blocks
 */
 
-struct inode inode_table[INODE_COUNT];  // 1 inode table contains [INODE_COUNT:196608] inodes
+struct inode inode_table[INODE_COUNT];          // 1 inode table contains [INODE_COUNT:196608] inodes
+struct data_block data_blk_table[BLK_COUNT];    // 1 data block table contains [BLK_COUNT:156864] data blocks
 
 enum FILE_TYPE {
     UNKNOWN=0,
@@ -70,12 +75,18 @@ struct directory_entry {            // 1 directory entry size = 4+4+256 = 264 by
     int inode_num;                  // the inode number of this directory
     enum FILE_TYPE file_type;       // the file type of this directory entry
     char name[DIR_ENTRY_NAME_LEN];  // the name of this directory entry
+    char waste[248];                // the name of this directory entry
+
     //int rec_len;
     //int name_len;                   // the length of this directory entry name
 };
 
 struct directory {
     struct directory_entry* directory_entry_table_ptr; 
+};
+
+struct indirect_data_block {
+    int idx[INDIRECT_BLOCK_PTR_NUM];
 };
 
 #endif
