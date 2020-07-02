@@ -16,20 +16,15 @@
 static struct super_block* super_ptr;
 
 /* a pointer which points to a block-bitmap data structure */
-// static struct block_bitmap* blk_bitmap_ptr;
 static struct block_bitmap blk_bitmap;
 static int blk_bitmap_cur_idx = 0;
 
 /* a pointer which points to a inode-bitmap data structure */
-// static struct inode_bitmap* inode_bitmap_ptr;
 static struct inode_bitmap i_bitmap;
 static int i_bitmap_cur_idx = ROOT_DIR_INODE_NUM;
 
 /* a pointer which points to inode data structure: indicating the first inode address */
 static struct inode* inode_table_ptr = 0;
-
-/* a pointer which points to a data blocks table data structure */
-// static struct data_block_table* storage = data_block_table;
 
 static int init_super();
 static int init_block_bitmap();
@@ -74,9 +69,9 @@ static int do_getattr( const char *path, struct stat *st )
 			if( strcmp(tmp_entry->name, new_path) == 0 && tmp_entry->inode_num != 0 ) {	// found the file/directory by the path parameter
 				printf("found the file %d\n", i);
 				struct	inode* tmp_found = inode_table_ptr + (tmp_entry->inode_num);
-				st->st_mode = ( tmp_entry->file_type == 2) ? S_IFDIR | 0755 : S_IFREG | 0644;
+				st->st_mode = ( tmp_entry->file_type == DIRECTORY) ? S_IFDIR | 0755 : S_IFREG | 0644;
 				st->st_size = super_ptr->blk_size;		// unsupport big file ( only <= 512 bytes )
-				st->st_nlink = ( tmp_entry->file_type == 2) ? 2 : 1;
+				st->st_nlink = ( tmp_entry->file_type == DIRECTORY) ? 2 : 1;
 				st->st_ino = tmp_entry->inode_num;		// need run with this option: -o use_ino
 				st->st_atime = tmp_found->atime.tv_sec;
 				st->st_ctime = tmp_found->ctime.tv_sec;
@@ -182,8 +177,6 @@ static int do_mkdir( const char *path, mode_t mode )
 	printf("i_bitmap_cur_idx is: %d\n", i_bitmap_cur_idx);
 
 	struct inode* cur_inode_ptr = inode_table_ptr+i_bitmap_cur_idx;
-	// struct data_block* tmp_data_blk = (struct data_block*) malloc(sizeof(struct data_block));	
-	// memset(tmp_data_blk, 0, sizeof(struct data_block));
 	struct data_block* tmp_data_blk = allocateDataBlock();
 	cur_inode_ptr->direct_blk_ptr[0] = tmp_data_blk;
 
@@ -192,8 +185,6 @@ static int do_mkdir( const char *path, mode_t mode )
 	dir_entry_table_ptr->file_type = DIRECTORY;
 	strncpy(dir_entry_table_ptr->name, ".", DIR_ENTRY_NAME_LEN);
 
-	// struct data_block* tmp_data_blk_2 = (struct data_block*) malloc(sizeof(struct data_block));
-	// memset(tmp_data_blk_2, 0, sizeof(struct data_block));
 	struct data_block* tmp_data_blk_2 = allocateDataBlock();
 	cur_inode_ptr->direct_blk_ptr[1] = tmp_data_blk_2;
 	
@@ -216,8 +207,6 @@ static int do_mkdir( const char *path, mode_t mode )
 		if(root->direct_blk_ptr[i]==NULL) {
 			// add new entry
 			printf("add new entry at int i: %d\n", i);
-			// struct data_block* new_entry = (struct data_block*) malloc(sizeof(struct data_block));	
-			// memset(new_entry, 0, sizeof(struct data_block));
 			struct data_block* new_entry = allocateDataBlock();
 			root->direct_blk_ptr[i] = new_entry;
 
@@ -421,45 +410,14 @@ static void* do_init(struct fuse_conn_info *conn)//, struct fuse_config *cfg)
 
 	// 5. Creates the /root directory
 	create_root_dir();
-	// super_ptr->root_dir_inode_num = ROOT_DIR_INODE_NUM;
 
 	// 6. Update the block bitmap and inode bitmap after creating /root directory
-	// for(int i=0; i<5; i++)
-	// 	printf("%d: %d\n", i, blk_bitmap.blk_bitmap[i]);
-	// printf("--------\n");
-	for(int i=0; i<5; i++)
-		printf("%d: %d\n", i, i_bitmap.inode_bitmap[i]);
-	printf("--------\n");
 
 	blk_bitmap.blk_bitmap[blk_bitmap_cur_idx++] = 1;
 	// i_bitmap.inode_bitmap[i_bitmap_cur_idx++] = 1;
 	i_bitmap.inode_bitmap[i_bitmap_cur_idx] = 1;
 	super_ptr->free_blk_count = super_ptr->free_blk_count-1;
 	super_ptr->free_inode_count = super_ptr->free_inode_count-1;
-	
-	// for(int i=0; i<5; i++)
-	// 	printf("%d: %d\n", i, blk_bitmap.blk_bitmap[i]);
-	// printf("--------\n");
-	for(int i=0; i<5; i++)
-		printf("%d: %d\n", i, i_bitmap.inode_bitmap[i]);
-	
-	/*
-	struct data_block* tmp_data_blk = (struct data_block*) malloc(sizeof(struct data_block));	// allocate memory space for one data block
-	memcpy(tmp_data_blk->buf, "abc", 4);	// assign data information to this data block
-	
-	inode_table_ptr->direct_blk_ptr[0] = tmp_data_blk;
-
-	printf("data block: %s\n", tmp_data_blk->buf);
-	printf("data block addr: %p\n", tmp_data_blk);
-
-	printf("inode_table_ptr: %s\n", inode_table_ptr->direct_blk_ptr[0]->buf);
-	printf("inode_table_ptr: %p\n", inode_table_ptr->direct_blk_ptr[0]);
-
-	for(int i=0; i<5; ++i) {
-		printf("%d: %s\n", i, inode_table_ptr->direct_blk_ptr[0]->buf);
-		printf("%d: %p\n", i, inode_table_ptr->direct_blk_ptr[0]);
-		inode_table_ptr = inode_table_ptr+1;	// iterate through the inode table with a pointer
-	}*/
 
 	return NULL;
 }
@@ -505,12 +463,6 @@ static int init_super()
 static int init_block_bitmap()
 {
 	memset(blk_bitmap.blk_bitmap, 0, sizeof(int)*BLK_COUNT);
-	// blk_bitmap_ptr = (struct block_bitmap*) calloc(1, sizeof(struct block_bitmap));
-	// if (blk_bitmap_ptr == NULL) { 
-	// 	printf("Failed to initialize block-bitmap.\n"); 
-	// 	exit(0); 
-	// }
-	// memset(blk_bi5tmap_ptr, 0, sizeof(struct block_bitmap));
 	printf("Successfully allocated block-bitmap.\n");
 	return 0;
 }
@@ -518,12 +470,6 @@ static int init_block_bitmap()
 static int init_inode_bitmap()
 {
 	memset(i_bitmap.inode_bitmap, 0, sizeof(int)*INODE_COUNT);
-	// inode_bitmap_ptr = (struct inode_bitmap*) calloc(1, sizeof(struct inode_bitmap));
-	// if (inode_bitmap_ptr == NULL) { 
-	// 	printf("Failed to initialize inode-bitmap.\n"); 
-	// 	exit(0); 
-	// }
-	// memset(inode_bitmap_ptr, 0, sizeof(struct inode_bitmap));
 	printf("Successfully allocated inode-bitmap.\n");
 	return 0;
 }
@@ -547,9 +493,6 @@ static int create_root_dir()
 	struct inode* cur_inode_ptr = inode_table_ptr+i_bitmap_cur_idx;
 
 	/* allocate memory space for one data block */
-	// struct data_block* tmp_data_blk = (struct data_block*) malloc(sizeof(struct data_block));	
-	// memset(tmp_data_blk, 0, sizeof(struct data_block));
-	// cur_inode_ptr->direct_blk_ptr[0] = tmp_data_blk;
 	struct data_block* tmp_data_blk = allocateDataBlock();
 	cur_inode_ptr->direct_blk_ptr[0] = tmp_data_blk;
 
@@ -558,8 +501,6 @@ static int create_root_dir()
 	dir_entry_table_ptr->file_type = DIRECTORY;
 	strncpy(dir_entry_table_ptr->name, ".", DIR_ENTRY_NAME_LEN);
 
-	// struct data_block* tmp_data_blk_2 = (struct data_block*) malloc(sizeof(struct data_block));
-	// memset(tmp_data_blk_2, 0, sizeof(struct data_block));
 	struct data_block* tmp_data_blk_2 = allocateDataBlock();
 	cur_inode_ptr->direct_blk_ptr[1] = tmp_data_blk_2;
 	
