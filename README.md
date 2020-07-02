@@ -22,7 +22,7 @@ parameter settings
 
 - total requires = 208993 pages = 856035328 bytes
 
-steps to mount a USB device with EXT4 filesystem
+steps to mount a USB device with EXT2 filesystem
 - mkdir ~/mnt
 - mkdir ~/mnt/usb32g
 - edit /etc/fstab   (fstab is your OS's file system table)
